@@ -271,7 +271,7 @@ static void add_file_button(GFile *file)
 	char *filename = g_file_get_path(file);
 	if (!g_file_query_exists(file, NULL)) {
 		fprintf(stderr, "The file `%s' does not exist.\n", filename);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	char *uri = g_file_get_uri(file);
 	if (all_compact) {
@@ -567,7 +567,7 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--thumb-size") == 0) {
 			if (argv[++i] == NULL || (thumb_size = atoi(argv[i])) <= 0) {
 				fprintf(stderr, "%s: error: bad argument for %s `%s'.\n", progname, argv[i - 1], argv[i]);
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
 			argv[i][0] = '\0';
 		} else if (argv[i][0] == '-') {
@@ -611,7 +611,7 @@ int main(int argc, char **argv)
 		if (drag_all)
 			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
 		target_mode();
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	if (from_stdin)
@@ -628,7 +628,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 
 	if (!uri_count)
-		short_usage(1);
+		short_usage(EXIT_FAILURE);
 
 	if (all_compact)
 		update_all_button();
@@ -642,5 +642,5 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
