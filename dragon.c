@@ -167,7 +167,8 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 	GdkDragAction action = gdk_drag_context_get_selected_action(context);
 
 	if (verbose) {
-		char *action_str;
+		char *action_str = NULL;
+
 		switch (action) {
 		case GDK_ACTION_COPY:
 			action_str = "COPY";
@@ -182,13 +183,12 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 			action_str = "ASK";
 			break;
 		default:
-			action_str = malloc(sizeof(char) * 20);
-			snprintf(action_str, 20, "invalid (%d)", action);
+			fprintf(stderr, "Selected drop action: %d (invalid); Succeeded: %d\n", action, succeeded);
 			break;
 		}
-		fprintf(stderr, "Selected drop action: %s; Succeeded: %d\n", action_str, succeeded);
-		if (action_str[0] == 'i')
-			free(action_str);
+
+		if (action_str)
+			fprintf(stderr, "Selected drop action: %s; Succeeded: %d\n", action_str, succeeded);
 	}
 
 	if (log_drop && succeeded && action) {
