@@ -315,12 +315,6 @@ static void add_file_button(GFile *file)
 		left_align_button(button);
 }
 
-static void add_filename_button(char *filename)
-{
-	GFile *file = g_file_new_for_path(filename);
-	add_file_button(file);
-}
-
 static void add_uri_button(char *uri)
 {
 	if (all_compact) {
@@ -390,14 +384,19 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint 
 		for (; *uris; uris++) {
 			if (is_file_uri(*uris)) {
 				GFile *file = g_file_new_for_uri(*uris);
+
 				if (print_path) {
 					char *filename = g_file_get_path(file);
 					printf("%s\n", filename);
-				} else
+					g_free(filename);
+				} else {
 					printf("%s\n", *uris);
+				}
+
 				if (keep)
 					add_file_button(file);
 
+				g_object_unref(file);
 			} else {
 				printf("%s\n", *uris);
 				if (keep)
@@ -446,14 +445,19 @@ static void target_mode(void)
 
 static void make_btn(char *filename)
 {
+	if (is_uri(filename) && !is_file_uri(filename))
+		return add_uri_button(filename);
+
+	GFile *file;
+
 	if (!is_uri(filename)) {
-		add_filename_button(filename);
+		file = g_file_new_for_path(filename);
 	} else if (is_file_uri(filename)) {
-		GFile *file = g_file_new_for_uri(filename);
-		add_file_button(file);
-	} else {
-		add_uri_button(filename);
+		file = g_file_new_for_uri(filename);
 	}
+
+	add_file_button(file);
+	g_object_unref(file);
 }
 
 static void readstdin(void)
