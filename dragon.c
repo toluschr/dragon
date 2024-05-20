@@ -326,18 +326,6 @@ static void add_uri_button(char *uri)
 	left_align_button(button);
 }
 
-static bool is_uri(char *uri)
-{
-	for (int i = 0; uri[i]; i++)
-		if (uri[i] == '/')
-			return false;
-		else if (uri[i] == ':' && i > 0)
-			return true;
-		else if (!((uri[i] >= 'a' && uri[i] <= 'z') || (uri[i] >= 'A' && uri[i] <= 'Z') || (uri[i] >= '0' && uri[i] <= '9' && i > 0) || (i > 0 && (uri[i] == '+' || uri[i] == '.' || uri[i] == '-')))) // RFC3986 URI scheme syntax
-			return false;
-	return false;
-}
-
 static bool is_file_uri(char *uri)
 {
 	char *prefix = "file:";
@@ -443,12 +431,14 @@ static void target_mode(void)
 
 static void make_btn(char *filename)
 {
-	if (is_uri(filename) && !is_file_uri(filename))
+	bool valid_uri = g_uri_is_valid(filename, G_URI_FLAGS_PARSE_RELAXED, NULL);
+
+	if (valid_uri && !is_file_uri(filename))
 		return add_uri_button(filename);
 
 	GFile *file;
 
-	if (!is_uri(filename)) {
+	if (!valid_uri) {
 		file = g_file_new_for_path(filename);
 	} else if (is_file_uri(filename)) {
 		file = g_file_new_for_uri(filename);
