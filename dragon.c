@@ -34,19 +34,15 @@ static GtkIconTheme *icon_theme;
 
 static char *progname;
 static bool verbose = false;
-static int mode = 0;
 static int thumb_size = 96;
 static bool and_exit;
 static bool keep;
+static bool target = false;
 static bool print_path = false;
 static bool icons_only = false;
 static bool always_on_top = false;
 
 static char *stdin_files;
-
-#define MODE_HELP 1
-#define MODE_TARGET 2
-#define MODE_VERSION 4
 
 #define TARGET_TYPE_TEXT 1
 #define TARGET_TYPE_URI 2
@@ -494,7 +490,7 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
 			verbose = true;
 		} else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--target") == 0) {
-			mode = MODE_TARGET;
+			target = true;
 		} else if (strcmp(argv[i], "-x") == 0 || strcmp(argv[i], "--and-exit") == 0) {
 			and_exit = true;
 		} else if (strcmp(argv[i], "-k") == 0 || strcmp(argv[i], "--keep") == 0) {
@@ -555,7 +551,7 @@ int main(int argc, char **argv)
 	if (all_compact)
 		create_all_button();
 
-	if (mode == MODE_TARGET) {
+	if (target) {
 		if (drag_all)
 			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
 		target_mode();
