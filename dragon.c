@@ -66,6 +66,41 @@ static struct draggable_thing fake_dragdata;
 static GtkWidget *all_button;
 // ---
 
+static void short_usage(int code)
+{
+	fprintf(stderr, "Usage: %s [OPTION] [FILENAME]\n", progname);
+	exit(code);
+}
+
+static void usage(int code)
+{
+	fprintf(stderr, "dragon - lightweight DnD source/target\n");
+	fprintf(stderr, "Usage: %s [OPTION] [FILENAME]\n", progname);
+	fprintf(stderr, "  --and-exit,    -x  exit after a single completed drop\n");
+	fprintf(stderr, "  --target,      -t  act as a target instead of source\n");
+	fprintf(stderr, "  --keep,        -k  with --target, keep files to drag out\n");
+	fprintf(stderr, "  --print-path,  -p  with --target, print file paths instead of URIs\n");
+	fprintf(stderr, "  --all,         -a  drag all files at once\n");
+	fprintf(stderr, "  --all-compact, -A  drag all files at once, only displaying the number of files\n");
+	fprintf(stderr, "  --icon-only,   -i  only show icons in drag-and-drop windows\n");
+	fprintf(stderr, "  --on-top,      -T  make window always-on-top\n");
+	fprintf(stderr, "  --stdin,       -I  read input from stdin\n");
+	fprintf(stderr, "  --thumb-size,  -s  set thumbnail size (default 96)\n");
+	fprintf(stderr, "  --verbose,     -v  be verbose\n");
+	fprintf(stderr, "  --help            show help\n");
+	fprintf(stderr, "  --version         show version details\n");
+	exit(code);
+}
+
+static void version(int code)
+{
+	fprintf(stderr, "dragon " VERSION "\n");
+	fprintf(stderr, "Copyright (C) 2014-2022 Michael Homer and contributors\n");
+	fprintf(stderr, "This program comes with ABSOLUTELY NO WARRANTY.\n");
+	fprintf(stderr, "See the source for copying conditions.\n");
+	exit(code);
+}
+
 static void add_target_button(void);
 
 static void do_quit(GtkWidget *widget, gpointer data)
@@ -453,33 +488,9 @@ int main(int argc, char **argv)
 	progname = argv[0];
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--help") == 0) {
-			mode = MODE_HELP;
-			printf("dragon - lightweight DnD source/target\n");
-			printf("Usage: %s [OPTION] [FILENAME]\n", progname);
-			printf("  --and-exit,    -x  exit after a single completed drop\n");
-			printf("  --target,      -t  act as a target instead of source\n");
-			printf("  --keep,        -k  with --target, keep files to drag out\n");
-			printf("  --print-path,  -p  with --target, print file paths"
-				   " instead of URIs\n");
-			printf("  --all,         -a  drag all files at once\n");
-			printf("  --all-compact, -A  drag all files at once, only displaying"
-				   " the number of files\n");
-			printf("  --icon-only,   -i  only show icons in drag-and-drop"
-				   " windows\n");
-			printf("  --on-top,      -T  make window always-on-top\n");
-			printf("  --stdin,       -I  read input from stdin\n");
-			printf("  --thumb-size,  -s  set thumbnail size (default 96)\n");
-			printf("  --verbose,     -v  be verbose\n");
-			printf("  --help            show help\n");
-			printf("  --version         show version details\n");
-			exit(0);
+			usage(0);
 		} else if (strcmp(argv[i], "--version") == 0) {
-			mode = MODE_VERSION;
-			puts("dragon " VERSION);
-			puts("Copyright (C) 2014-2022 Michael Homer and contributors");
-			puts("This program comes with ABSOLUTELY NO WARRANTY.");
-			puts("See the source for copying conditions.");
-			exit(0);
+			version(0);
 		} else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
 			verbose = true;
 		} else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--target") == 0) {
@@ -564,8 +575,7 @@ int main(int argc, char **argv)
 		readstdin();
 
 	if (!uri_count) {
-		printf("Usage: %s [OPTIONS] FILENAME\n", progname);
-		exit(0);
+		short_usage(1);
 	}
 
 	if (all_compact)
