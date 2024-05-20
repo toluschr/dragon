@@ -101,7 +101,7 @@ static void add_target_button(void);
 
 static void do_quit(GtkWidget *widget, gpointer data)
 {
-	exit(0);
+	gtk_main_quit();
 }
 
 static void button_clicked(GtkWidget *widget, gpointer user_data)
@@ -422,13 +422,6 @@ static void add_target_button(void)
 	g_signal_connect(GTK_WIDGET(label), "drag-data-received", G_CALLBACK(drag_data_received), NULL);
 }
 
-static void target_mode(void)
-{
-	add_target_button();
-	gtk_widget_show_all(window);
-	gtk_main();
-}
-
 static void make_btn(char *filename)
 {
 	bool valid_uri = g_uri_is_valid(filename, G_URI_FLAGS_PARSE_RELAXED, NULL);
@@ -600,31 +593,30 @@ int main(int argc, char **argv)
 	if (target) {
 		if (drag_all)
 			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
-		target_mode();
-		exit(EXIT_SUCCESS);
+
+		add_target_button();
+	} else {
+		if (from_stdin)
+			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
+		else if (drag_all)
+			uri_collection = malloc(sizeof(char *) * ((argc > MAX_SIZE ? argc : MAX_SIZE) + 1));
+
+		for (int i = 1; i < argc; i++) {
+			if (argv[i][0] != '-' && argv[i][0] != '\0')
+				make_btn(argv[i]);
+		}
+
+		if (from_stdin && !read_file_list(stdin))
+			return EXIT_FAILURE;
+
+		if (!uri_count)
+			short_usage(EXIT_FAILURE);
+
+		if (all_compact)
+			update_all_button();
 	}
-
-	if (from_stdin)
-		uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
-	else if (drag_all)
-		uri_collection = malloc(sizeof(char *) * ((argc > MAX_SIZE ? argc : MAX_SIZE) + 1));
-
-	for (int i = 1; i < argc; i++) {
-		if (argv[i][0] != '-' && argv[i][0] != '\0')
-			make_btn(argv[i]);
-	}
-
-	if (from_stdin && !read_file_list(stdin))
-		return EXIT_FAILURE;
-
-	if (!uri_count)
-		short_usage(EXIT_FAILURE);
-
-	if (all_compact)
-		update_all_button();
 
 	gtk_widget_show_all(window);
-
 	gtk_main();
 
 	if (fflush(stdout) == EOF) {
@@ -632,5 +624,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	free(uri_collection);
 	return EXIT_SUCCESS;
 }
