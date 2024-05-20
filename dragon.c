@@ -76,11 +76,24 @@ static void do_quit(GtkWidget *widget, gpointer data)
 static void button_clicked(GtkWidget *widget, gpointer user_data)
 {
 	struct draggable_thing *dd = (struct draggable_thing *)user_data;
+	pid_t pid;
 
-	if (fork() == 0) {
-		// TODO: cleanup
+	switch ((pid = fork())) {
+	default:
+		return;
+	case -1:
+		break;
+	case 0:
+		// Return value of setsid may be ignored
+		setsid();
+
+		// @todo: Possible file descriptor leak?
+
 		execlp("xdg-open", "xdg-open", dd->uri, NULL);
+		break;
 	}
+
+	fprintf(stderr, "Executing xdg-open for %s failed: %s\n", dd->uri, strerror(errno));
 }
 
 static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data, guint info, guint time, gpointer user_data)
