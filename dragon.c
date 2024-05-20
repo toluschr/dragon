@@ -37,6 +37,7 @@ static bool verbose = false;
 static int thumb_size = 96;
 static bool and_exit;
 static bool keep;
+static bool log_drop = false;
 static bool target = false;
 static bool print_path = false;
 static bool icons_only = false;
@@ -83,6 +84,7 @@ static void usage(int code)
 	fprintf(stderr, "  --stdin,       -I  read input from stdin\n");
 	fprintf(stderr, "  --thumb-size,  -s  set thumbnail size (default 96)\n");
 	fprintf(stderr, "  --verbose,     -v  be verbose\n");
+	fprintf(stderr, "  --log-drop,    -l  log file to stdout after it has been dropped\n");
 	fprintf(stderr, "  --help            show help\n");
 	fprintf(stderr, "  --version         show version details\n");
 	exit(code);
@@ -159,9 +161,12 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelecti
 
 static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 {
+	struct draggable_thing *dd = (struct draggable_thing *)user_data;
+
+	gboolean succeeded = gdk_drag_drop_succeeded(context);
+	GdkDragAction action = gdk_drag_context_get_selected_action(context);
+
 	if (verbose) {
-		gboolean succeeded = gdk_drag_drop_succeeded(context);
-		GdkDragAction action = gdk_drag_context_get_selected_action(context);
 		char *action_str;
 		switch (action) {
 		case GDK_ACTION_COPY:
@@ -185,6 +190,21 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 		if (action_str[0] == 'i')
 			free(action_str);
 	}
+
+	if (log_drop && succeeded && action) {
+		if (print_path) {
+			GFile *file = g_file_new_for_uri(dd->uri);
+			char *filename = g_file_get_path(file);
+
+			printf("%s\n", filename);
+
+			g_free(filename);
+			g_object_unref(file);
+		} else {
+			printf("%s\n", dd->uri);
+		}
+	}
+
 	if (and_exit)
 		gtk_main_quit();
 }
@@ -346,6 +366,7 @@ static gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gi
 			list = g_list_next(list);
 		}
 	}
+
 	gtk_drag_finish(context, false, false, time);
 	return true;
 }
@@ -487,6 +508,8 @@ int main(int argc, char **argv)
 			usage(0);
 		} else if (strcmp(argv[i], "--version") == 0) {
 			version(0);
+		} else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--log-drop") == 0) {
+			log_drop = true;
 		} else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
 			verbose = true;
 		} else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--target") == 0) {
