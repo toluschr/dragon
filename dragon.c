@@ -28,19 +28,19 @@
 
 #define MAX_SIZE 100
 
-GtkWidget *window;
-GtkWidget *vbox;
-GtkIconTheme *icon_theme;
+static GtkWidget *window;
+static GtkWidget *vbox;
+static GtkIconTheme *icon_theme;
 
-char *progname;
-bool verbose = false;
-int mode = 0;
-int thumb_size = 96;
-bool and_exit;
-bool keep;
-bool print_path = false;
-bool icons_only = false;
-bool always_on_top = false;
+static char *progname;
+static bool verbose = false;
+static int mode = 0;
+static int thumb_size = 96;
+static bool and_exit;
+static bool keep;
+static bool print_path = false;
+static bool icons_only = false;
+static bool always_on_top = false;
 
 static char *stdin_files;
 
@@ -57,23 +57,23 @@ struct draggable_thing {
 };
 
 // MODE_ALL
-char **uri_collection;
-int uri_count = 0;
-bool drag_all = false;
-bool all_compact = false;
-char file_num_label[10];
-struct draggable_thing fake_dragdata;
-GtkWidget *all_button;
+static char **uri_collection;
+static int uri_count = 0;
+static bool drag_all = false;
+static bool all_compact = false;
+static char file_num_label[10];
+static struct draggable_thing fake_dragdata;
+static GtkWidget *all_button;
 // ---
 
-void add_target_button();
+static void add_target_button(void);
 
-void do_quit(GtkWidget *widget, gpointer data)
+static void do_quit(GtkWidget *widget, gpointer data)
 {
 	exit(0);
 }
 
-void button_clicked(GtkWidget *widget, gpointer user_data)
+static void button_clicked(GtkWidget *widget, gpointer user_data)
 {
 	struct draggable_thing *dd = (struct draggable_thing *)user_data;
 
@@ -83,7 +83,7 @@ void button_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data, guint info, guint time, gpointer user_data)
+static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data, guint info, guint time, gpointer user_data)
 {
 	struct draggable_thing *dd = (struct draggable_thing *)user_data;
 	if (info == TARGET_TYPE_URI) {
@@ -113,7 +113,7 @@ void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData 
 	}
 }
 
-void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
+static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 {
 	if (verbose) {
 		gboolean succeeded = gdk_drag_drop_succeeded(context);
@@ -145,7 +145,7 @@ void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 		gtk_main_quit();
 }
 
-void add_uri(char *uri)
+static void add_uri(char *uri)
 {
 	if (uri_count < MAX_SIZE) {
 		uri_collection[uri_count] = uri;
@@ -155,7 +155,7 @@ void add_uri(char *uri)
 	}
 }
 
-GtkButton *add_button(char *label, struct draggable_thing *dragdata, int type)
+static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int type)
 {
 	GtkWidget *button;
 
@@ -191,20 +191,20 @@ GtkButton *add_button(char *label, struct draggable_thing *dragdata, int type)
 	return (GtkButton *)button;
 }
 
-void left_align_button(GtkButton *button)
+static void left_align_button(GtkButton *button)
 {
 	GList *child = g_list_first(gtk_container_get_children(GTK_CONTAINER(button)));
 	if (child)
 		gtk_widget_set_halign(GTK_WIDGET(child->data), GTK_ALIGN_START);
 }
 
-GtkIconInfo *icon_info_from_content_type(char *content_type)
+static GtkIconInfo *icon_info_from_content_type(char *content_type)
 {
 	GIcon *icon = g_content_type_get_icon(content_type);
 	return gtk_icon_theme_lookup_by_gicon(icon_theme, icon, 48, 0);
 }
 
-void add_file_button(GFile *file)
+static void add_file_button(GFile *file)
 {
 	char *filename = g_file_get_path(file);
 	if (!g_file_query_exists(file, NULL)) {
@@ -251,13 +251,13 @@ void add_file_button(GFile *file)
 		left_align_button(button);
 }
 
-void add_filename_button(char *filename)
+static void add_filename_button(char *filename)
 {
 	GFile *file = g_file_new_for_path(filename);
 	add_file_button(file);
 }
 
-void add_uri_button(char *uri)
+static void add_uri_button(char *uri)
 {
 	if (all_compact) {
 		add_uri(uri);
@@ -270,7 +270,7 @@ void add_uri_button(char *uri)
 	left_align_button(button);
 }
 
-bool is_uri(char *uri)
+static bool is_uri(char *uri)
 {
 	for (int i = 0; uri[i]; i++)
 		if (uri[i] == '/')
@@ -282,13 +282,13 @@ bool is_uri(char *uri)
 	return false;
 }
 
-bool is_file_uri(char *uri)
+static bool is_file_uri(char *uri)
 {
 	char *prefix = "file:";
 	return strncmp(prefix, uri, strlen(prefix)) == 0;
 }
 
-gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, gpointer user_data)
+static gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, gpointer user_data)
 {
 	GtkTargetList *targetlist = gtk_drag_dest_get_target_list(widget);
 	GList *list = gdk_drag_context_list_targets(context);
@@ -306,13 +306,13 @@ gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, g
 	return true;
 }
 
-void update_all_button()
+static void update_all_button(void)
 {
 	sprintf(file_num_label, "%d files", uri_count);
 	gtk_button_set_label((GtkButton *)all_button, file_num_label);
 }
 
-void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y, GtkSelectionData *data, guint info, guint time)
+static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y, GtkSelectionData *data, guint info, guint time)
 {
 	gchar **uris = gtk_selection_data_get_uris(data);
 	unsigned char *text = gtk_selection_data_get_text(data);
@@ -354,7 +354,7 @@ void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint
 		gtk_main_quit();
 }
 
-void add_target_button()
+static void add_target_button(void)
 {
 	GtkWidget *label = gtk_button_new();
 	gtk_button_set_label(GTK_BUTTON(label), "Drag something here...");
@@ -372,14 +372,14 @@ void add_target_button()
 	g_signal_connect(GTK_WIDGET(label), "drag-data-received", G_CALLBACK(drag_data_received), NULL);
 }
 
-void target_mode()
+static void target_mode(void)
 {
 	add_target_button();
 	gtk_widget_show_all(window);
 	gtk_main();
 }
 
-void make_btn(char *filename)
+static void make_btn(char *filename)
 {
 	if (!is_uri(filename)) {
 		add_filename_button(filename);
@@ -414,7 +414,7 @@ static void readstdin(void)
 	}
 }
 
-void create_all_button()
+static void create_all_button(void)
 {
 	sprintf(file_num_label, "%d files", uri_count);
 	all_button = gtk_button_new_with_label(file_num_label);
