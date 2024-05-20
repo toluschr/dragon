@@ -43,8 +43,6 @@ static bool print_path = false;
 static bool icons_only = false;
 static bool always_on_top = false;
 
-static char *stdin_files;
-
 #define TARGET_TYPE_TEXT 1
 #define TARGET_TYPE_URI 2
 
@@ -460,27 +458,59 @@ static void make_btn(char *filename)
 	g_object_unref(file);
 }
 
-static void readstdin(void)
+static bool read_file_list(FILE *fp)
 {
-	char *write_pos = stdin_files, *newline;
-	size_t max_size = BUFSIZ * 2, cur_size = 0;
-	// read each line from stdin and add it to the item list
-	while (fgets(write_pos, BUFSIZ, stdin)) {
-		if (write_pos[0] == '-')
-			continue;
-		if ((newline = strchr(write_pos, '\n')))
-			*newline = '\0';
-		else
-			break;
-		make_btn(write_pos);
-		cur_size = newline - stdin_files + 1;
-		if (max_size < cur_size + BUFSIZ) {
-			if (!(stdin_files = realloc(stdin_files, (max_size += BUFSIZ))))
-				fprintf(stderr, "%s: cannot realloc %lu bytes.\n", progname, max_size);
-			newline = stdin_files + cur_size - 1;
-		}
-		write_pos = newline + 1;
+	bool rc = false;
+	size_t offset = 0;
+	size_t bufsize = 2;
+	char *buf = malloc(bufsize);
+
+	if (buf == NULL) {
+		perror("Failed to allocate memory for file list");
+		goto error;
 	}
+
+	while ((fgets(buf + offset, bufsize - offset, fp))) {
+		size_t total_size = offset + strlen(buf + offset);
+
+		// total_size > 0 ensured by fgets if BUFSIZ > 1
+		if (buf[total_size - 1] == '\n') {
+			buf[total_size - 1] = '\0';
+			total_size--;
+		}
+
+		// allocate more
+		if (total_size >= bufsize - 1) {
+			bufsize += BUFSIZ;
+
+			char *new_buf = realloc(buf, bufsize);
+			if (new_buf == NULL) {
+				perror("Failed to realloc memory for file list");
+				goto error;
+			}
+
+			offset = total_size;
+			buf = new_buf;
+			continue;
+		}
+
+		if (total_size == 0) {
+			continue;
+		}
+
+		make_btn(buf);
+	}
+
+	if (ferror(stdin)) {
+		perror("Failed to read stdin");
+		goto error;
+	}
+
+	rc = true;
+
+error:
+	free(buf);
+	return rc;
 }
 
 static void create_all_button(void)
@@ -505,7 +535,6 @@ static void create_all_button(void)
 int main(int argc, char **argv)
 {
 	bool from_stdin = false;
-	stdin_files = malloc(BUFSIZ * 2);
 	progname = argv[0];
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--help") == 0) {
@@ -594,12 +623,12 @@ int main(int argc, char **argv)
 		if (argv[i][0] != '-' && argv[i][0] != '\0')
 			make_btn(argv[i]);
 	}
-	if (from_stdin)
-		readstdin();
 
-	if (!uri_count) {
+	if (from_stdin && !read_file_list(stdin))
+		return EXIT_FAILURE;
+
+	if (!uri_count)
 		short_usage(1);
-	}
 
 	if (all_compact)
 		update_all_button();
