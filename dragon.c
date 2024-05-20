@@ -575,5 +575,10 @@ int main(int argc, char **argv)
 
 	gtk_main();
 
+	if (fflush(stdout) == EOF) {
+		fprintf(stderr, "Unable to write some data to stdout\n");
+		return EXIT_FAILURE;
+	}
+
 	return 0;
 }
