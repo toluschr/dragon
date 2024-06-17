@@ -47,18 +47,14 @@ static bool output_files = false;
 #define TARGET_TYPE_TEXT 1
 #define TARGET_TYPE_URI 2
 
-struct draggable_thing {
-	char *text;
-	char *uri;
-};
+static gchar *all_texts[MAX_SIZE + 1];
+static gchar *all_uris[MAX_SIZE + 1];
+static int count = 0;
 
-// MODE_ALL
-static char **uri_collection;
-static int uri_count = 0;
 static bool drag_all = false;
 static bool all_compact = false;
+// This must be updated in accordance with MAX_SIZE
 static char file_num_label[10];
-static struct draggable_thing fake_dragdata;
 static GtkWidget *all_button;
 // ---
 
@@ -113,7 +109,7 @@ static void button_clicked(GtkWidget *widget, gpointer user_data)
 {
 	(void)widget;
 	(void)user_data;
-	struct draggable_thing *dd = user_data;
+	gchar *ptr = user_data;
 
 	pid_t pid;
 
@@ -128,11 +124,11 @@ static void button_clicked(GtkWidget *widget, gpointer user_data)
 
 		// @todo: Possible file descriptor leak?
 
-		execlp("xdg-open", "xdg-open", dd->uri, NULL);
+		execlp("xdg-open", "xdg-open", ptr, NULL);
 		break;
 	}
 
-	fprintf(stderr, "Executing xdg-open for %s failed: %s\n", dd->uri, strerror(errno));
+	fprintf(stderr, "Executing xdg-open for %s failed: %s\n", ptr, strerror(errno));
 }
 
 static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data, guint info, guint time, gpointer user_data)
@@ -140,31 +136,38 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelecti
 	(void)widget;
 	(void)context;
 	(void)time;
-	struct draggable_thing *dd = user_data;
+	gchar *ptr = user_data;
+
+	gchar *mem[2] = {NULL};
+	gchar **uris = mem;
 
 	if (info == TARGET_TYPE_URI) {
-		char **uris;
-		char *single_uri_data[2] = { dd->uri, NULL };
+		if (ptr != NULL) {
+			mem[0] = ptr;
 
-		if (drag_all) {
-			uris = uri_collection;
+			if (verbose) {
+				fprintf(stderr, "Sending as URI: %s\n", ptr);
+			}
 		} else {
-			uris = single_uri_data;
-		}
+			uris = all_uris;
 
-		if (verbose) {
-			if (drag_all)
-				fputs("Sending all as URI\n", stderr);
-			else
-				fprintf(stderr, "Sending as URI: %s\n", dd->uri);
+			if (verbose) {
+				fprintf(stderr, "Sending all as URI\n");
+			}
 		}
 
 		gtk_selection_data_set_uris(data, uris);
 		g_signal_stop_emission_by_name(widget, "drag-data-get");
 	} else if (info == TARGET_TYPE_TEXT) {
-		if (verbose)
-			fprintf(stderr, "Sending as TEXT: %s\n", dd->text);
-		gtk_selection_data_set_text(data, dd->text, -1);
+		if (ptr != NULL) {
+			mem[0] = ptr;
+
+			if (verbose) {
+				fprintf(stderr, "Sending as TEXT: %s\n", ptr);
+			}
+
+			gtk_selection_data_set_text(data, ptr, -1);
+		}
 	} else {
 		fprintf(stderr, "Error: bad target type %i\n", info);
 	}
@@ -174,6 +177,7 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 {
 	(void)widget;
 
+	gchar *ptr = user_data;
 	gboolean succeeded = gdk_drag_drop_succeeded(context);
 	GdkDragAction action = gdk_drag_context_get_selected_action(context);
 
@@ -203,16 +207,29 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 	}
 
 	if (log_drop && succeeded && action) {
-		if (print_path) {
-			GFile *file = g_file_new_for_uri(dd->uri);
-			char *filename = g_file_get_path(file);
+		int c;
+		gchar **arr;
 
-			printf("%s\n", filename);
-
-			g_free(filename);
-			g_object_unref(file);
+		if (ptr != NULL) {
+			c = 1;
+			arr = &ptr;
 		} else {
-			printf("%s\n", dd->uri);
+			c = count;
+			arr = all_uris;
+		}
+
+		for (int i = 0; i < c; i++) {
+			if (print_path) {
+				GFile *file = g_file_new_for_uri(arr[i]);
+				char *filename = g_file_get_path(file);
+
+				printf("%s\n", filename);
+
+				g_free(filename);
+				g_object_unref(file);
+			} else {
+				printf("%s\n", arr[i]);
+			}
 		}
 	}
 
@@ -220,20 +237,22 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 		gtk_main_quit();
 }
 
-static bool add_uri(char *uri)
+static int add_uri_text(char *uri, char *text)
 {
-	if (uri_count < MAX_SIZE) {
-		uri_collection[uri_count++] = uri;
-		uri_collection[uri_count] = NULL;
-	} else {
-		fprintf(stderr, "Exceeded maximum number of files for drag_all (%d)\n", MAX_SIZE);
-		return false;
+	if (count >= MAX_SIZE) {
+		fprintf(stderr, "Exceeded maximum number of files (%d)\n", MAX_SIZE);
+		return -1;
 	}
 
-	return true;
+	all_uris[count + 0] = uri;
+	all_uris[count + 1] = NULL;
+
+	all_texts[count + 0] = text;
+	all_texts[count + 1] = NULL;
+	return count++;
 }
 
-static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int type)
+static GtkButton *add_button(char *label, int offset, int type)
 {
 	GtkWidget *button;
 
@@ -248,6 +267,7 @@ static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int 
 		gtk_target_list_ref(targetlist);
 	else
 		targetlist = gtk_target_list_new(NULL, 0);
+
 	if (type == TARGET_TYPE_URI)
 		gtk_target_list_add_uri_targets(targetlist, TARGET_TYPE_URI);
 	else
@@ -255,9 +275,9 @@ static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int 
 
 	gtk_drag_source_set(GTK_WIDGET(button), GDK_BUTTON1_MASK, NULL, 0, GDK_ACTION_COPY | GDK_ACTION_LINK | GDK_ACTION_ASK);
 	gtk_drag_source_set_target_list(GTK_WIDGET(button), targetlist);
-	g_signal_connect(GTK_WIDGET(button), "drag-data-get", G_CALLBACK(drag_data_get), dragdata);
-	g_signal_connect(GTK_WIDGET(button), "clicked", G_CALLBACK(button_clicked), dragdata);
-	g_signal_connect(GTK_WIDGET(button), "drag-end", G_CALLBACK(drag_end), dragdata);
+	g_signal_connect(GTK_WIDGET(button), "drag-data-get", G_CALLBACK(drag_data_get), all_uris[offset]);
+	g_signal_connect(GTK_WIDGET(button), "clicked", G_CALLBACK(button_clicked), all_uris[offset]);
+	g_signal_connect(GTK_WIDGET(button), "drag-end", G_CALLBACK(drag_end), all_uris[offset]);
 
 	gtk_container_add(GTK_CONTAINER(vbox), button);
 
@@ -277,23 +297,27 @@ static GtkIconInfo *icon_info_from_content_type(char *content_type)
 	return gtk_icon_theme_lookup_by_gicon(icon_theme, icon, 48, 0);
 }
 
-static void add_file_button(GFile *file)
+static bool add_file_button(GFile *file)
 {
 	char *filename = g_file_get_path(file);
 	if (!g_file_query_exists(file, NULL)) {
 		fprintf(stderr, "The file `%s' does not exist.\n", filename);
-		exit(EXIT_FAILURE);
+		return false;
 	}
 
-	// ref
-	add_uri(filename);
-
 	char *uri = g_file_get_uri(file);
-	struct draggable_thing *dragdata = malloc(sizeof(struct draggable_thing));
-	dragdata->text = filename;
-	dragdata->uri = uri;
 
-	GtkButton *button = add_button(filename, dragdata, TARGET_TYPE_URI);
+	// ref
+	int offset = add_uri_text(uri, filename);
+	if (offset < 0) {
+		return false;
+	}
+
+	if (all_compact) {
+		return true;
+	}
+
+	GtkButton *button = add_button(filename, offset, TARGET_TYPE_URI);
 	GdkPixbuf *pb = gdk_pixbuf_new_from_file_at_size(filename, thumb_size, thumb_size, NULL);
 	if (pb) {
 		GtkWidget *image = gtk_image_new_from_pixbuf(pb);
@@ -322,17 +346,24 @@ static void add_file_button(GFile *file)
 
 	if (!icons_only)
 		left_align_button(button);
+
+	return true;
 }
 
-static void add_uri_button(char *uri)
+static bool add_uri_button(char *uri)
 {
-	add_uri(uri);
+	int offset = add_uri_text(uri, uri);
+	if (offset < 0) {
+		return false;
+	}
 
-	struct draggable_thing *dragdata = malloc(sizeof(struct draggable_thing));
-	dragdata->text = uri;
-	dragdata->uri = uri;
-	GtkButton *button = add_button(uri, dragdata, TARGET_TYPE_URI);
+	if (all_compact) {
+		return true;
+	}
+
+	GtkButton *button = add_button(uri, offset, TARGET_TYPE_URI);
 	left_align_button(button);
+	return true;
 }
 
 static bool is_file_uri(char *uri)
@@ -366,7 +397,7 @@ static gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gi
 
 static void update_all_button(void)
 {
-	sprintf(file_num_label, "%d files", uri_count);
+	sprintf(file_num_label, "%d files", count);
 	gtk_button_set_label((GtkButton *)all_button, file_num_label);
 }
 
@@ -439,7 +470,7 @@ static void add_target_button(void)
 	g_signal_connect(GTK_WIDGET(label), "drag-data-received", G_CALLBACK(drag_data_received), NULL);
 }
 
-static void make_btn(char *filename)
+static bool make_btn(char *filename)
 {
 	bool valid_uri = g_uri_is_valid(filename, G_URI_FLAGS_PARSE_RELAXED, NULL);
 
@@ -456,6 +487,7 @@ static void make_btn(char *filename)
 
 	add_file_button(file);
 	g_object_unref(file);
+	return true;
 }
 
 static bool read_file_list(FILE *fp)
@@ -519,19 +551,16 @@ error:
 
 static void create_all_button(void)
 {
-	sprintf(file_num_label, "%d files", uri_count);
+	sprintf(file_num_label, "%d files", count);
 	all_button = gtk_button_new_with_label(file_num_label);
 
 	GtkTargetList *targetlist = gtk_target_list_new(NULL, 0);
 	gtk_target_list_add_uri_targets(targetlist, TARGET_TYPE_URI);
 
-	// fake uri to avoid segfault when callback deference it
-	fake_dragdata.uri = file_num_label;
-
 	gtk_drag_source_set(GTK_WIDGET(all_button), GDK_BUTTON1_MASK, NULL, 0, GDK_ACTION_COPY | GDK_ACTION_LINK | GDK_ACTION_ASK);
 	gtk_drag_source_set_target_list(GTK_WIDGET(all_button), targetlist);
-	g_signal_connect(GTK_WIDGET(all_button), "drag-data-get", G_CALLBACK(drag_data_get), &fake_dragdata);
-	g_signal_connect(GTK_WIDGET(all_button), "drag-end", G_CALLBACK(drag_end), &fake_dragdata);
+	g_signal_connect(GTK_WIDGET(all_button), "drag-data-get", G_CALLBACK(drag_data_get), NULL);
+	g_signal_connect(GTK_WIDGET(all_button), "drag-end", G_CALLBACK(drag_end), NULL);
 
 	gtk_container_add(GTK_CONTAINER(vbox), all_button);
 }
@@ -610,15 +639,12 @@ int main(int argc, char **argv)
 
 	gtk_window_set_title(GTK_WINDOW(window), "dragon");
 
-	if (all_compact)
+	if (drag_all)
 		create_all_button();
 
 	if (target) {
-		uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
 		add_target_button();
 	} else {
-		uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
-
 		for (int i = 1; i < argc; i++) {
 			if (argv[i][0] != '-' && argv[i][0] != '\0')
 				make_btn(argv[i]);
@@ -627,10 +653,10 @@ int main(int argc, char **argv)
 		if (from_stdin && !read_file_list(stdin))
 			return EXIT_FAILURE;
 
-		if (!uri_count)
+		if (!count)
 			short_usage(EXIT_FAILURE);
 
-		if (all_compact)
+		if (drag_all)
 			update_all_button();
 	}
 
@@ -638,8 +664,8 @@ int main(int argc, char **argv)
 	gtk_main();
 
 	if (output_files) {
-		for (int i = 0; i < uri_count; i++) {
-			printf("%s\n", uri_collection[i]);
+		for (int i = 0; i < count; i++) {
+			printf("%s\n", all_texts[i]);
 		}
 	}
 
@@ -648,6 +674,5 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	free(uri_collection);
 	return EXIT_SUCCESS;
 }
