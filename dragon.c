@@ -42,6 +42,7 @@ static bool target = false;
 static bool print_path = false;
 static bool icons_only = false;
 static bool always_on_top = false;
+static bool output_files = false;
 
 #define TARGET_TYPE_TEXT 1
 #define TARGET_TYPE_URI 2
@@ -83,8 +84,9 @@ static void usage(int code)
 	fprintf(stderr, "  --thumb-size,  -s  set thumbnail size (default 96)\n");
 	fprintf(stderr, "  --verbose,     -v  be verbose\n");
 	fprintf(stderr, "  --log-drop,    -l  log file to stdout after it has been dropped\n");
-	fprintf(stderr, "  --help            show help\n");
-	fprintf(stderr, "  --version         show version details\n");
+	fprintf(stderr, "  --help             show help\n");
+	fprintf(stderr, "  --version          show version details\n");
+	fprintf(stderr, "  --output       -o  print all files to stdout after successful quit (used with pipes and --stdin)\n");
 	exit(code);
 }
 
@@ -133,12 +135,13 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelecti
 	if (info == TARGET_TYPE_URI) {
 		char **uris;
 		char *single_uri_data[2] = { dd->uri, NULL };
+
 		if (drag_all) {
-			uri_collection[uri_count] = NULL;
 			uris = uri_collection;
 		} else {
 			uris = single_uri_data;
 		}
+
 		if (verbose) {
 			if (drag_all)
 				fputs("Sending all as URI\n", stderr);
@@ -207,14 +210,17 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 		gtk_main_quit();
 }
 
-static void add_uri(char *uri)
+static bool add_uri(char *uri)
 {
 	if (uri_count < MAX_SIZE) {
-		uri_collection[uri_count] = uri;
-		uri_count++;
+		uri_collection[uri_count++] = uri;
+		uri_collection[uri_count] = NULL;
 	} else {
 		fprintf(stderr, "Exceeded maximum number of files for drag_all (%d)\n", MAX_SIZE);
+		return false;
 	}
+
+	return true;
 }
 
 static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int type)
@@ -245,11 +251,6 @@ static GtkButton *add_button(char *label, struct draggable_thing *dragdata, int 
 
 	gtk_container_add(GTK_CONTAINER(vbox), button);
 
-	if (drag_all)
-		add_uri(dragdata->uri);
-	else
-		uri_count++;
-
 	return (GtkButton *)button;
 }
 
@@ -273,11 +274,11 @@ static void add_file_button(GFile *file)
 		fprintf(stderr, "The file `%s' does not exist.\n", filename);
 		exit(EXIT_FAILURE);
 	}
+
+	// ref
+	add_uri(filename);
+
 	char *uri = g_file_get_uri(file);
-	if (all_compact) {
-		add_uri(uri);
-		return;
-	}
 	struct draggable_thing *dragdata = malloc(sizeof(struct draggable_thing));
 	dragdata->text = filename;
 	dragdata->uri = uri;
@@ -315,10 +316,8 @@ static void add_file_button(GFile *file)
 
 static void add_uri_button(char *uri)
 {
-	if (all_compact) {
-		add_uri(uri);
-		return;
-	}
+	add_uri(uri);
+
 	struct draggable_thing *dragdata = malloc(sizeof(struct draggable_thing));
 	dragdata->text = uri;
 	dragdata->uri = uri;
@@ -557,6 +556,8 @@ int main(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 			argv[i][0] = '\0';
+		} else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+			output_files = true;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "%s: error: unknown option `%s'.\n", progname, argv[i]);
 		}
@@ -595,15 +596,10 @@ int main(int argc, char **argv)
 		create_all_button();
 
 	if (target) {
-		if (drag_all)
-			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
-
+		uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
 		add_target_button();
 	} else {
-		if (from_stdin)
-			uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
-		else if (drag_all)
-			uri_collection = malloc(sizeof(char *) * ((argc > MAX_SIZE ? argc : MAX_SIZE) + 1));
+		uri_collection = malloc(sizeof(char *) * (MAX_SIZE + 1));
 
 		for (int i = 1; i < argc; i++) {
 			if (argv[i][0] != '-' && argv[i][0] != '\0')
@@ -622,6 +618,12 @@ int main(int argc, char **argv)
 
 	gtk_widget_show_all(window);
 	gtk_main();
+
+	if (output_files) {
+		for (int i = 0; i < uri_count; i++) {
+			printf("%s\n", uri_collection[i]);
+		}
+	}
 
 	if (fflush(stdout) == EOF) {
 		fprintf(stderr, "Unable to write some data to stdout\n");
