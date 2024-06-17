@@ -26,8 +26,6 @@
 
 #define VERSION "1.2.0"
 
-#define MAX_SIZE 100
-
 static GtkWidget *window;
 static GtkWidget *vbox;
 static GtkIconTheme *icon_theme;
@@ -47,14 +45,14 @@ static bool output_files = false;
 #define TARGET_TYPE_TEXT 1
 #define TARGET_TYPE_URI 2
 
-static gchar *all_texts[MAX_SIZE + 1];
-static gchar *all_uris[MAX_SIZE + 1];
+static gchar **all_texts;
+static gchar **all_uris;
+
 static int count = 0;
+static int max_size = 0;
 
 static bool drag_all = false;
 static bool all_compact = false;
-// This must be updated in accordance with MAX_SIZE
-static char file_num_label[10];
 static GtkWidget *all_button;
 // ---
 
@@ -239,9 +237,23 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 
 static int add_uri_text(char *uri, char *text)
 {
-	if (count >= MAX_SIZE) {
-		fprintf(stderr, "Exceeded maximum number of files (%d)\n", MAX_SIZE);
-		return -1;
+	if (count >= max_size) {
+		max_size = 1 + max_size * 1.25;
+		gchar **new_all_uris = realloc(all_uris, (max_size + 1) * sizeof(*all_uris));
+		if (new_all_uris == NULL) {
+			perror("Unable to allocate memory for uris");
+			return -1;
+		}
+
+		all_uris = new_all_uris;
+
+		gchar **new_all_texts = realloc(all_texts, (max_size + 1) * sizeof(*all_texts));
+		if (new_all_texts == NULL) {
+			perror("Unable to allocate memory for texts");
+			return -1;
+		}
+
+		all_texts = new_all_texts;
 	}
 
 	all_uris[count + 0] = uri;
@@ -395,10 +407,20 @@ static gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gi
 	return true;
 }
 
-static void update_all_button(void)
+static bool update_all_button(void)
 {
-	sprintf(file_num_label, "%d files", count);
-	gtk_button_set_label((GtkButton *)all_button, file_num_label);
+	int length = snprintf(NULL, 0, "%d files", count);
+	if (length < 0) {
+		return false;
+	}
+
+	char str[length + 1];
+	if (snprintf(str, sizeof(str), "%d files", count) < 0) {
+		return false;
+	}
+
+	gtk_button_set_label((GtkButton *)all_button, str);
+	return true;
 }
 
 static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y, GtkSelectionData *data, guint info, guint time)
@@ -557,8 +579,7 @@ error:
 
 static void create_all_button(void)
 {
-	sprintf(file_num_label, "%d files", count);
-	all_button = gtk_button_new_with_label(file_num_label);
+	all_button = gtk_button_new();
 
 	GtkTargetList *targetlist = gtk_target_list_new(NULL, 0);
 	gtk_target_list_add_uri_targets(targetlist, TARGET_TYPE_URI);
@@ -569,6 +590,7 @@ static void create_all_button(void)
 	g_signal_connect(GTK_WIDGET(all_button), "drag-end", G_CALLBACK(drag_end), NULL);
 
 	gtk_container_add(GTK_CONTAINER(vbox), all_button);
+	update_all_button();
 }
 
 int main(int argc, char **argv)
