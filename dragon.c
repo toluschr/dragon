@@ -453,13 +453,12 @@ static bool read_file_list(FILE *fp)
 		goto error;
 	}
 
-	while ((fgets(buf + offset, bufsize - offset, fp))) {
+	while (fgets(buf + offset, bufsize - offset, fp)) {
 		size_t total_size = offset + strlen(buf + offset);
 
 		// total_size > 0 ensured by fgets if BUFSIZ > 1
 		if (buf[total_size - 1] == '\n') {
-			buf[total_size - 1] = '\0';
-			total_size--;
+			buf[--total_size] = '\0';
 		}
 
 		// allocate more
@@ -481,6 +480,11 @@ static bool read_file_list(FILE *fp)
 			continue;
 		}
 
+		make_btn(buf);
+		offset = 0;
+	}
+
+	if (offset) {
 		make_btn(buf);
 	}
 
