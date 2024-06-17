@@ -427,8 +427,9 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint 
 					printf("%s\n", *uris);
 				}
 
-				if (keep)
+				if (keep) {
 					add_file_button(file);
+				}
 
 				g_object_unref(file);
 			} else {
@@ -437,8 +438,10 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint 
 					add_uri_button(*uris);
 			}
 		}
+
 		if (all_compact)
 			update_all_button();
+
 		add_target_button();
 		gtk_widget_show_all(window);
 	} else if (text) {
@@ -485,9 +488,9 @@ static bool make_btn(char *filename)
 		file = g_file_new_for_uri(filename);
 	}
 
-	add_file_button(file);
+	bool out = add_file_button(file);
 	g_object_unref(file);
-	return true;
+	return out;
 }
 
 static bool read_file_list(FILE *fp)
@@ -529,12 +532,15 @@ static bool read_file_list(FILE *fp)
 			continue;
 		}
 
-		make_btn(buf);
+		if (!make_btn(buf)) {
+			goto error;
+		}
+
 		offset = 0;
 	}
 
-	if (offset) {
-		make_btn(buf);
+	if (offset && !make_btn(buf)) {
+		goto error;
 	}
 
 	if (ferror(stdin)) {
@@ -646,8 +652,11 @@ int main(int argc, char **argv)
 		add_target_button();
 	} else {
 		for (int i = 1; i < argc; i++) {
-			if (argv[i][0] != '-' && argv[i][0] != '\0')
-				make_btn(argv[i]);
+			if (argv[i][0] != '-' && argv[i][0] != '\0') {
+				if (!make_btn(argv[i])) {
+					exit(EXIT_FAILURE);
+				}
+			}
 		}
 
 		if (from_stdin && !read_file_list(stdin))
