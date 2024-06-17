@@ -13,7 +13,7 @@ LDFLAGS += $(GTK_LDLIBS)
 .PHONY: all
 all: $(NAME)
 
-$(NAME): dragon.c Makefile
+$(NAME): dragon.c makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) $(DEFINES) dragon.c -o $(NAME)
 
 .PHONY: install
