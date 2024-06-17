@@ -101,14 +101,20 @@ static void version(int code)
 
 static void add_target_button(void);
 
-static void do_quit(GtkWidget *widget, gpointer data)
+static void do_quit(GtkWidget *widget, gpointer user_data)
 {
+	(void)widget;
+	(void)user_data;
+
 	gtk_main_quit();
 }
 
 static void button_clicked(GtkWidget *widget, gpointer user_data)
 {
-	struct draggable_thing *dd = (struct draggable_thing *)user_data;
+	(void)widget;
+	(void)user_data;
+	struct draggable_thing *dd = user_data;
+
 	pid_t pid;
 
 	switch ((pid = fork())) {
@@ -131,7 +137,11 @@ static void button_clicked(GtkWidget *widget, gpointer user_data)
 
 static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data, guint info, guint time, gpointer user_data)
 {
-	struct draggable_thing *dd = (struct draggable_thing *)user_data;
+	(void)widget;
+	(void)context;
+	(void)time;
+	struct draggable_thing *dd = user_data;
+
 	if (info == TARGET_TYPE_URI) {
 		char **uris;
 		char *single_uri_data[2] = { dd->uri, NULL };
@@ -162,7 +172,7 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelecti
 
 static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 {
-	struct draggable_thing *dd = (struct draggable_thing *)user_data;
+	(void)widget;
 
 	gboolean succeeded = gdk_drag_drop_succeeded(context);
 	GdkDragAction action = gdk_drag_context_get_selected_action(context);
@@ -333,6 +343,10 @@ static bool is_file_uri(char *uri)
 
 static gboolean drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, gpointer user_data)
 {
+	(void)x;
+	(void)y;
+	(void)user_data;
+
 	GtkTargetList *targetlist = gtk_drag_dest_get_target_list(widget);
 	GList *list = gdk_drag_context_list_targets(context);
 	if (list) {
@@ -358,6 +372,10 @@ static void update_all_button(void)
 
 static void drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y, GtkSelectionData *data, guint info, guint time)
 {
+	(void)x;
+	(void)y;
+	(void)info;
+
 	gchar **uris = gtk_selection_data_get_uris(data);
 	unsigned char *text = gtk_selection_data_get_text(data);
 	if (!uris && !text)

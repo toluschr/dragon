@@ -6,7 +6,7 @@ GTK_CFLAGS = `pkg-config --cflags gtk+-3.0`
 GTK_LDLIBS = `pkg-config --libs gtk+-3.0`
 
 CFLAGS += $(GTK_CFLAGS)
-CFLAGS += -Wall -Werror --std=c99
+CFLAGS += -Wall -Wextra -Werror -pedantic --std=c99
 
 LDFLAGS += $(GTK_LDLIBS)
 
