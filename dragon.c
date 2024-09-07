@@ -235,7 +235,7 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 		gtk_main_quit();
 }
 
-static int add_uri_text(char *uri, char *text)
+static int add_uri_text_nocopy(char *uri, char *text)
 {
 	int eno;
 
@@ -323,11 +323,17 @@ static bool add_file_button(GFile *file)
 	}
 
 	char *uri = g_file_get_uri(file);
+	if (uri == NULL) {
+		fprintf(stderr, "The uri `%s` is invalid.\n", filename);
+		g_free(filename);
+		return false;
+	}
 
 	// ref
-	int offset = add_uri_text(uri, filename);
+	int offset = add_uri_text_nocopy(uri, filename);
 	if (offset < 0) {
 		g_free(filename);
+		g_free(uri);
 		return false;
 	}
 
@@ -370,7 +376,7 @@ static bool add_file_button(GFile *file)
 
 static bool add_uri_button(char *uri)
 {
-	int offset = add_uri_text(uri, uri);
+	int offset = add_uri_text_nocopy(uri, uri);
 	if (offset < 0) {
 		return false;
 	}
