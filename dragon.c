@@ -58,14 +58,14 @@ static GtkWidget *all_button;
 
 static void short_usage(int code)
 {
-	fprintf(stderr, "Usage: %s [OPTION] [FILENAME]\n", progname);
+	fprintf(stderr, "Usage: %s [OPTION] [--] [FILENAME]\n", progname);
 	exit(code);
 }
 
 static void usage(int code)
 {
 	fprintf(stderr, "dragon - lightweight DnD source/target\n");
-	fprintf(stderr, "Usage: %s [OPTION] [FILENAME]\n", progname);
+	fprintf(stderr, "Usage: %s [OPTION] [--] [FILENAME]\n", progname);
 	fprintf(stderr, "  --and-exit,    -x  exit after a single completed drop\n");
 	fprintf(stderr, "  --target,      -t  act as a target instead of source\n");
 	fprintf(stderr, "  --keep,        -k  with --target, keep files to drag out\n");
@@ -604,10 +604,14 @@ int main(int argc, char **argv)
 	bool from_stdin = false;
 	progname = argv[0];
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--help") == 0) {
-			usage(0);
+		if (strcmp(argv[i], "--") == 0) {
+			argv = argv + i;
+			argc = argc - i;
+			break;
+		} else if (strcmp(argv[i], "--help") == 0) {
+			usage(EXIT_SUCCESS);
 		} else if (strcmp(argv[i], "--version") == 0) {
-			version(0);
+			version(EXIT_SUCCESS);
 		} else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--log-drop") == 0) {
 			log_drop = true;
 		} else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
@@ -636,13 +640,17 @@ int main(int argc, char **argv)
 				fprintf(stderr, "%s: error: bad argument for %s `%s'.\n", progname, argv[i - 1], argv[i]);
 				exit(EXIT_FAILURE);
 			}
-			argv[i][0] = '\0';
 		} else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
 			output_files = true;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "%s: error: unknown option `%s'.\n", progname, argv[i]);
+		} else {
+			continue;
 		}
+
+		argv[i][0] = '\0';
 	}
+
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
 	GtkAccelGroup *accelgroup;
@@ -680,10 +688,12 @@ int main(int argc, char **argv)
 		add_target_button();
 	} else {
 		for (int i = 1; i < argc; i++) {
-			if (argv[i][0] != '-' && argv[i][0] != '\0') {
-				if (!make_btn(argv[i])) {
-					exit(EXIT_FAILURE);
-				}
+			if (argv[i][0] == '\0') {
+				continue;
+			}
+
+			if (!make_btn(argv[i])) {
+				exit(EXIT_FAILURE);
 			}
 		}
 
