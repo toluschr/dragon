@@ -237,23 +237,27 @@ static void drag_end(GtkWidget *widget, GdkDragContext *context, gpointer user_d
 
 static int add_uri_text(char *uri, char *text)
 {
+	int eno;
+
 	if (count >= max_size) {
 		max_size = 1 + max_size * 1.25;
 		gchar **new_all_uris = realloc(all_uris, (max_size + 1) * sizeof(*all_uris));
-		if (new_all_uris == NULL) {
-			perror("Unable to allocate memory for uris");
-			return -1;
-		}
-
-		all_uris = new_all_uris;
-
 		gchar **new_all_texts = realloc(all_texts, (max_size + 1) * sizeof(*all_texts));
-		if (new_all_texts == NULL) {
-			perror("Unable to allocate memory for texts");
+
+		if (new_all_uris)
+			all_uris = new_all_uris;
+
+		if (new_all_texts)
+			all_texts = new_all_texts;
+
+		if (new_all_texts == NULL || new_all_uris == NULL) {
+			eno = errno;
+			perror("Unable to allocate memory for uri/text");
+			free(all_texts);
+			free(all_uris);
+			errno = eno;
 			return -1;
 		}
-
-		all_texts = new_all_texts;
 	}
 
 	all_uris[count + 0] = uri;
@@ -314,6 +318,7 @@ static bool add_file_button(GFile *file)
 	char *filename = g_file_get_path(file);
 	if (!g_file_query_exists(file, NULL)) {
 		fprintf(stderr, "The file `%s' does not exist.\n", filename);
+		g_free(filename);
 		return false;
 	}
 
@@ -322,6 +327,7 @@ static bool add_file_button(GFile *file)
 	// ref
 	int offset = add_uri_text(uri, filename);
 	if (offset < 0) {
+		g_free(filename);
 		return false;
 	}
 
